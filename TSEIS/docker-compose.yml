@@ -1,8 +1,0 @@
-version: '2'
-
-services:
-  test.service:
-    image: test.service
-    build:
-      context: ./Test.Service
-      dockerfile: Dockerfile
