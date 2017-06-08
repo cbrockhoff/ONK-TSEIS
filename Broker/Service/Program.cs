@@ -29,29 +29,26 @@ namespace Broker.Service
             var buyOfferRepo = container.GetInstance<IBuyOfferRepository>();
             var ownerRepo = container.GetInstance<IStocksRepository>();
 
-            var receives = new[]
+            bus.Subscribe<StockTradeHappenedEventDto>(async e =>
             {
-                bus.Subscribe<StockTradeHappenedEventDto>(async e =>
-                {
-                    await ownerRepo.Delete(e.SellerId, e.Stock, e.Amount);
-                    await ownerRepo.Write(e.BuyerId, e.Stock, e.Amount);
-                }),
-                bus.Subscribe<UserReceivedStockEventDto>(e => ownerRepo.Write(e.UserId, e.Stock, e.Amount)),
-                bus.Receive<SetStockForSaleCommandDto>(async cmd =>
-                {
-                    if ((await ownerRepo.GetAmount(cmd.SellerId, cmd.Stock) != cmd.Amount))
-                        return;
+                await ownerRepo.Delete(e.SellerId, e.Stock, e.Amount);
+                await ownerRepo.Write(e.BuyerId, e.Stock, e.Amount);
+            });
+            bus.Subscribe<UserReceivedStockEventDto>(e => ownerRepo.Write(e.UserId, e.Stock, e.Amount));
+            bus.Receive<SetStockForSaleCommandDto>(async cmd =>
+            {
+                if ((await ownerRepo.GetAmount(cmd.SellerId, cmd.Stock) != cmd.Amount))
+                    return;
 
-                    await forSaleRepo.Write(cmd.SellerId, cmd.Stock, cmd.Amount, cmd.Price);
-                    await bus.Publish(new StockSetForSaleEventDto()
-                    {
-                        Name = cmd.Stock,
-                        Amount = cmd.Amount,
-                        Price = cmd.Price
-                    });
-                }),
-                bus.Receive<PlaceBuyOfferCommandDto>(cmd => buyOfferRepo.Write(cmd.BuyerId, cmd.Stock, cmd.Amount, cmd.Price))
-            };
+                await forSaleRepo.Write(cmd.SellerId, cmd.Stock, cmd.Amount, cmd.Price);
+                await bus.Publish(new StockSetForSaleEventDto()
+                {
+                    Name = cmd.Stock,
+                    Amount = cmd.Amount,
+                    Price = cmd.Price
+                });
+            });
+            bus.Receive<PlaceBuyOfferCommandDto>(cmd => buyOfferRepo.Write(cmd.BuyerId, cmd.Stock, cmd.Amount, cmd.Price));
 
             var timer = new Timer(o =>
             {
@@ -62,10 +59,6 @@ namespace Broker.Service
             hack.WaitOne();
 
             timer.Dispose();
-            foreach (var r in receives)
-            {
-                r.Dispose();
-            }
         }
 
         static void MatchOffers(
