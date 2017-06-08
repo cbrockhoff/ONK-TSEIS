@@ -56,12 +56,21 @@ namespace Shared.Messaging
                 routingKey: typeof(TMessage).Name);
 
             var consumer = new EventingBasicConsumer(channel);
-            consumer.Received += (o, args) => Manage<TMessage>(() =>
+            consumer.Received += (o, args) =>
             {
-                var message = DeserializeMessage<TMessage>(args.Body);
-                onEvent(message).Wait();
-                _logger.Information(Guid.Empty, $"Successfully handled {typeof(TMessage).Name} with body {JsonConvert.SerializeObject(message)}").GetAwaiter().GetResult();
-            });
+                try
+                {
+                    var message = DeserializeMessage<TMessage>(args.Body);
+                    onEvent(message).GetAwaiter().GetResult();
+                    _logger.Information(Guid.Empty, $"Successfully handled {typeof(TMessage).Name} with body {JsonConvert.SerializeObject(message)}").GetAwaiter().GetResult();
+                }
+                catch (Exception e)
+                {
+                    var msg = $"Error handling {typeof(TMessage).Name}: {e.Message}";
+                    Console.WriteLine(msg);
+                    _logger.Error(Guid.Empty, msg);
+                }
+            };
 
             channel.BasicConsume(
                 queue: queueName,
@@ -103,12 +112,21 @@ namespace Shared.Messaging
             var queue = DeclareQueue(channel, typeof(TMessage));
 
             var consumer = new EventingBasicConsumer(channel);
-            consumer.Received += (o, args) => Manage<TMessage>(() =>
+            consumer.Received += (o, args) =>
             {
-                var message = DeserializeMessage<TMessage>(args.Body);
-                onCommand(message).Wait();
-                _logger.Information(Guid.Empty, $"Successfully handled {typeof(TMessage).Name} with body {JsonConvert.SerializeObject(message)}").GetAwaiter().GetResult();
-            });
+                try
+                {
+                    var message = DeserializeMessage<TMessage>(args.Body);
+                    onCommand(message).GetAwaiter().GetResult();
+                    _logger.Information(Guid.Empty, $"Successfully handled {typeof(TMessage).Name} with body {JsonConvert.SerializeObject(message)}").GetAwaiter().GetResult();
+                }
+                catch (Exception e)
+                {
+                    var msg = $"Error handling {typeof(TMessage).Name}: {e.Message}";
+                    Console.WriteLine(msg);
+                    _logger.Error(Guid.Empty, msg);
+                }
+            };
 
             channel.BasicConsume(
                 queue: queue,
@@ -149,19 +167,6 @@ namespace Shared.Messaging
                 exclusive: false,
                 autoDelete: false); 
             return queue;
-        }
-
-        private void Manage<TMessage>(Action action)
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                _logger.Error(Guid.Empty, $"Error handling {typeof(TMessage).Name}: {e.Message}");
-            }
         }
     }
 }
