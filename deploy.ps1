@@ -59,7 +59,7 @@ function kubectl-delete
 		while($i -lt 15)
 		{
 			$s = ((kubectl delete deployment $name) 2>&1).ToString()
-			if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd'))
+			if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd') -or $s.Contains('wsarecv'))
 			{
 				Start-Sleep -s 1
 			}
@@ -80,7 +80,7 @@ function kubectl-delete
 		while($i -lt 15)
 		{
 			$s = ((kubectl delete service $name) 2>&1).ToString()
-			if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd'))
+			if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd') -or $s.Contains('wsarecv'))
 			{
 				Start-Sleep -s 1
 			}
@@ -111,7 +111,7 @@ function kubectl-run
 		{
 			$s = ((kubectl run $name --image=$name --replicas=$replicas --image-pull-policy=Never) 2>&1).ToString()
 		}
-		if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd'))
+		if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd') -or $s.Contains('wsarecv'))
 		{
 			Start-Sleep -s 1
 		}
@@ -138,7 +138,7 @@ function kubectl-expose
 		{
 			$s = ((kubectl expose deployment $name) 2>&1).ToString()
 		}
-		if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd'))
+		if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd') -or $s.Contains('wsarecv'))
 		{
 			Start-Sleep -s 1
 		}
