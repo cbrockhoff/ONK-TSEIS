@@ -30,7 +30,7 @@ namespace Requester.RestAPI.Controllers
             {
                 Stocks = forsale.Select(rm => new StockForSaleResultModel()
                 {
-                    Name = rm.Name,
+                    Name = rm.Stock,
                     Amount = rm.Amount,
                     Price = rm.Price
                 })

@@ -48,7 +48,7 @@ namespace OwnerControl.Persistence
                     await c.OpenAsync().ConfigureAwait(false);
                     await c.ExecuteAsync(
                         "delete from stocks where userid=@id and name=@stock and amount=@amount",
-                        new { userid = userId, name = stock, amount = amount }).ConfigureAwait(false);
+                        new { id = userId, name = stock, amount = amount }).ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {
