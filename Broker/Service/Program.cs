@@ -31,6 +31,12 @@ namespace Broker.Service
 
             var receives = new[]
             {
+                bus.Subscribe<StockTradeHappenedEventDto>(async e =>
+                {
+                    await ownerRepo.Delete(e.SellerId, e.Stock, e.Amount);
+                    await ownerRepo.Write(e.BuyerId, e.Stock, e.Amount);
+                }),
+                bus.Subscribe<UserReceivedStockEventDto>(e => ownerRepo.Write(e.UserId, e.Stock, e.Amount)),
                 bus.Receive<SetStockForSaleCommandDto>(async cmd =>
                 {
                     if ((await ownerRepo.GetAmount(cmd.SellerId, cmd.Stock) != cmd.Amount))
@@ -44,13 +50,7 @@ namespace Broker.Service
                         Price = cmd.Price
                     });
                 }),
-                bus.Receive<PlaceBuyOfferCommandDto>(cmd => buyOfferRepo.Write(cmd.BuyerId, cmd.Stock, cmd.Amount, cmd.Price)),
-                bus.Subscribe<StockTradeHappenedEventDto>(async e =>
-                {
-                    await ownerRepo.Delete(e.SellerId, e.Stock, e.Amount);
-                    await ownerRepo.Write(e.BuyerId, e.Stock, e.Amount);
-                }),
-                bus.Subscribe<UserReceivedStockEventDto>(e => ownerRepo.Write(e.UserId, e.Stock, e.Amount))
+                bus.Receive<PlaceBuyOfferCommandDto>(cmd => buyOfferRepo.Write(cmd.BuyerId, cmd.Stock, cmd.Amount, cmd.Price))
             };
 
             var timer = new Timer(o =>

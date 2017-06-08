@@ -25,7 +25,7 @@ namespace TobinTaxer.Service
             var bus = container.GetInstance<IMessageBus>();
             var logger = container.GetInstance<ILogger>();
 
-            var recv = bus.Subscribe<StockTradeHappenedEventDto>(e => 
+            var recv = bus.Subscribe<StockTradeHappenedEventDto>(e =>
                 logger.Information(Guid.Empty, $"Pretend I taxed the transaction of stock {e.Stock} from seller {e.SellerId} to buyer {e.BuyerId}"));
 
             var hack = new ManualResetEvent(false);

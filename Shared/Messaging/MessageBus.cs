@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Logging;
@@ -11,7 +10,7 @@ using Shared.Contracts;
 
 namespace Shared.Messaging
 {
-    public class MessageBus : IMessageBus
+    public class MessageBus : IMessageBus, IDisposable
     {
         private readonly IConnectionFactory _connectionFactory;
         private readonly ILogger _logger;
@@ -47,39 +46,34 @@ namespace Shared.Messaging
 
         public IDisposable Subscribe<TMessage>(Func<TMessage, Task> onEvent) where TMessage : IEvent
         {
-            var channel = _connectionFactory.CreateConnection().CreateModel();
-            var exchange = DeclareEventsExchange(channel);
-            var queueName = channel.QueueDeclare(_service).QueueName; 
-            channel.QueueBind(
-                queue: queueName,
-                exchange: exchange,
-                routingKey: typeof(TMessage).Name);
-
-            var consumer = new EventingBasicConsumer(channel);
-            consumer.Received += (o, args) =>
+            try
             {
-                try
-                {
-                    var message = DeserializeMessage<TMessage>(args.Body);
-                    onEvent(message).GetAwaiter().GetResult();
-                    _logger.Information(Guid.Empty, $"Successfully handled {typeof(TMessage).Name} with body {JsonConvert.SerializeObject(message)}").GetAwaiter().GetResult();
-                }
-                catch (Exception e)
-                {
-                    var msg = $"Error handling {typeof(TMessage).Name}: {e.Message}";
-                    Console.WriteLine(msg);
-                    _logger.Error(Guid.Empty, msg);
-                }
-            };
+                var channel = _connectionFactory.CreateConnection().CreateModel();
+                var exchange = DeclareEventsExchange(channel);
+                var queueName = channel.QueueDeclare(_service).QueueName; 
+                channel.QueueBind(
+                    queue: queueName,
+                    exchange: exchange,
+                    routingKey: typeof(TMessage).Name);
 
-            channel.BasicConsume(
-                queue: queueName,
-                noAck: false,
-                consumer: consumer);
+                var consumer = CreateConsumer(channel, onEvent);
 
-            _connections.Add(channel);
-            Console.WriteLine($"Subscribed to {typeof(TMessage).Name}");
-            return channel;
+                channel.BasicConsume(
+                    queue: queueName,
+                    noAck: false,
+                    consumer: consumer);
+
+                _connections.Add(channel);
+                Console.WriteLine($"Subscribed to {typeof(TMessage).Name}");
+                return channel;
+            }
+            catch (Exception e)
+            {
+                var msg = $"Something went wrong while trying to subscribe to {typeof(TMessage).Name} : {e.Message}";
+                Console.WriteLine(msg);
+                _logger.Error(Guid.Empty, msg).GetAwaiter().GetResult();
+                return null;
+            }
         }
 
         public async Task Send(ICommand command)
@@ -108,34 +102,29 @@ namespace Shared.Messaging
 
         public IDisposable Receive<TMessage>(Func<TMessage, Task> onCommand) where TMessage : ICommand
         {
-            var channel = _connectionFactory.CreateConnection().CreateModel();
-            var queue = DeclareQueue(channel, typeof(TMessage));
-
-            var consumer = new EventingBasicConsumer(channel);
-            consumer.Received += (o, args) =>
+            try
             {
-                try
-                {
-                    var message = DeserializeMessage<TMessage>(args.Body);
-                    onCommand(message).GetAwaiter().GetResult();
-                    _logger.Information(Guid.Empty, $"Successfully handled {typeof(TMessage).Name} with body {JsonConvert.SerializeObject(message)}").GetAwaiter().GetResult();
-                }
-                catch (Exception e)
-                {
-                    var msg = $"Error handling {typeof(TMessage).Name}: {e.Message}";
-                    Console.WriteLine(msg);
-                    _logger.Error(Guid.Empty, msg);
-                }
-            };
+                var channel = _connectionFactory.CreateConnection().CreateModel();
+                var queue = DeclareQueue(channel, typeof(TMessage));
 
-            channel.BasicConsume(
-                queue: queue,
-                noAck: false,
-                consumer: consumer);
+                var consumer = CreateConsumer(channel, onCommand);
 
-            _connections.Add(channel);
-            Console.WriteLine($"Receiving {typeof(TMessage).Name}");
-            return channel;
+                channel.BasicConsume(
+                    queue: queue,
+                    noAck: false,
+                    consumer: consumer);
+
+                _connections.Add(channel);
+                Console.WriteLine($"Receiving {typeof(TMessage).Name}");
+                return channel;
+            }
+            catch (Exception e)
+            {
+                var msg = $"Something went wrong when receiving {typeof(TMessage).Name} : {e.Message}";
+                Console.WriteLine(msg);
+                _logger.Error(Guid.Empty, msg).GetAwaiter().GetResult();
+                return null;
+            }
         }
 
         private static byte[] SerializeMessage(object message)
@@ -167,6 +156,35 @@ namespace Shared.Messaging
                 exclusive: false,
                 autoDelete: false); 
             return queue;
+        }
+
+        private EventingBasicConsumer CreateConsumer<TMessage>(IModel model, Func<TMessage, Task> onMessage)
+        {
+            var consumer = new EventingBasicConsumer(model);
+            consumer.Received += (o, args) =>
+            {
+                try
+                {
+                    var message = DeserializeMessage<TMessage>(args.Body);
+                    onMessage(message).GetAwaiter().GetResult();
+                    _logger.Information(Guid.Empty, $"Successfully handled {typeof(TMessage).Name} with body {JsonConvert.SerializeObject(message)}").GetAwaiter().GetResult();
+                }
+                catch (Exception e)
+                {
+                    var msg = $"Error handling {typeof(TMessage).Name}: {e.Message}";
+                    Console.WriteLine(msg);
+                    _logger.Error(Guid.Empty, msg);
+                }
+            };
+            return consumer;
+        }
+
+        public void Dispose()
+        {
+            foreach (var c in _connections)
+            {
+                c.Dispose();
+            }
         }
     }
 }
