@@ -18,7 +18,7 @@ namespace Broker.Persistence
                 await c.OpenAsync().ConfigureAwait(false);
                 await c.ExecuteAsync(
                     "insert into stocks (ownerid, stock, amount) values (@id, @stock, @amount)",
-                    new {id=@userId, stock=stock, amount=amount}).ConfigureAwait(false);
+                    new {id=userId, stock=stock, amount=amount}).ConfigureAwait(false);
             }
         }
 
@@ -28,7 +28,7 @@ namespace Broker.Persistence
             {
                 await c.OpenAsync().ConfigureAwait(false);
                 return await c.QueryFirstOrDefaultAsync<int>(
-                    "delete from stocks where ownerid=@id and stock=@stock",
+                    "select amount from stocks where ownerid=@id and stock=@stock",
                     new { id = @userId, stock = stock }).ConfigureAwait(false);
             }
         }
