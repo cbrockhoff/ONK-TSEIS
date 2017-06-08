@@ -35,8 +35,12 @@ namespace Broker.Service
             bus.Subscribe<UserReceivedStockEventDto>(e => ownerRepo.Write(e.UserId, e.Stock, e.Amount));
             bus.Receive<SetStockForSaleCommandDto>(async cmd =>
             {
-                if ((await ownerRepo.GetAmount(cmd.SellerId, cmd.Stock) != cmd.Amount))
+                var sellerStockAmount = await ownerRepo.GetAmount(cmd.SellerId, cmd.Stock).ConfigureAwait(false);
+                if (sellerStockAmount != cmd.Amount)
+                {
+                    Console.WriteLine($"Seller has {sellerStockAmount} {cmd.Stock} stocks but tried to sell {cmd.Amount}\nReturning...");
                     return;
+                }
 
                 await forSaleRepo.Write(cmd.SellerId, cmd.Stock, cmd.Amount, cmd.Price);
                 await bus.Publish(new StockSetForSaleEventDto()
@@ -46,12 +50,13 @@ namespace Broker.Service
                     Price = cmd.Price
                 });
             });
-            bus.Receive<PlaceBuyOfferCommandDto>(cmd => buyOfferRepo.Write(cmd.BuyerId, cmd.Stock, cmd.Amount, cmd.Price));
+            bus.Receive<PlaceBuyOfferCommandDto>(cmd => buyOfferRepo.Write(
+                cmd.BuyerId, 
+                cmd.Stock, 
+                cmd.Amount, 
+                cmd.Price));
 
-            var timer = new Timer(o =>
-            {
-                MatchOffers(forSaleRepo, buyOfferRepo, ownerRepo, bus);
-            }, null, 10000, 10000);
+            var timer = new Timer(o => { MatchOffers(forSaleRepo, buyOfferRepo, ownerRepo, bus); }, null, 10000, 10000);
 
             var hack = new ManualResetEvent(false);
             hack.WaitOne();
@@ -60,7 +65,7 @@ namespace Broker.Service
         }
 
         static void MatchOffers(
-            IStocksForSaleRepository forSaleRepo, 
+            IStocksForSaleRepository forSaleRepo,
             IBuyOfferRepository buyOffersRepo,
             IStocksRepository ownerRepo,
             IMessageBus bus)
@@ -75,7 +80,7 @@ namespace Broker.Service
             {
                 try
                 {
-                    var matchingForSale = stocksForSale.FirstOrDefault(s => 
+                    var matchingForSale = stocksForSale.FirstOrDefault(s =>
                         string.Equals(s.Stock, offer.Stock, StringComparison.CurrentCultureIgnoreCase) &&
                         s.Price == offer.Price &&
                         s.Amount == offer.Amount);
@@ -87,10 +92,11 @@ namespace Broker.Service
                     stocksForSale.Remove(matchingForSale);
                     Task.WhenAll(
                         buyOffersRepo.Delete(offer.BuyerId, offer.Stock, offer.Amount, offer.Price),
-                        forSaleRepo.Delete(matchingForSale.SellerId, matchingForSale.Stock, matchingForSale.Amount, matchingForSale.Price),
+                        forSaleRepo.Delete(matchingForSale.SellerId, matchingForSale.Stock, matchingForSale.Amount,
+                            matchingForSale.Price),
                         ownerRepo.Delete(matchingForSale.SellerId, offer.Stock, offer.Amount),
                         ownerRepo.Write(offer.BuyerId, offer.Stock, offer.Amount),
-                    bus.Publish(new StockTradeHappenedEventDto()
+                        bus.Publish(new StockTradeHappenedEventDto()
                         {
                             BuyerId = offer.BuyerId,
                             SellerId = matchingForSale.SellerId,
