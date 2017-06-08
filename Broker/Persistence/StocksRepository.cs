@@ -28,7 +28,7 @@ namespace Broker.Persistence
             {
                 await c.OpenAsync().ConfigureAwait(false);
                 return await c.QueryFirstOrDefaultAsync<int>(
-                    "delete from stocks where ownerid=@id and stock=@stock)",
+                    "delete from stocks where ownerid=@id and stock=@stock",
                     new { id = @userId, stock = stock }).ConfigureAwait(false);
             }
         }
@@ -50,7 +50,7 @@ namespace Broker.Persistence
             {
                 await c.OpenAsync().ConfigureAwait(false);
                 await c.ExecuteAsync(
-                    "delete from stocks where ownerid=@id and stock=@stock and amount=@amount)",
+                    "delete from stocks where ownerid=@id and stock=@stock and amount=@amount",
                     new { id = @userId, stock = stock, amount = amount }).ConfigureAwait(false);
             }
         }
