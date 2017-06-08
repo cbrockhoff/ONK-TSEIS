@@ -50,7 +50,9 @@ namespace Shared.Messaging
             {
                 var channel = _connectionFactory.CreateConnection().CreateModel();
                 var exchange = DeclareEventsExchange(channel);
-                var queueName = channel.QueueDeclare(_service).QueueName; 
+                var queueName = channel.QueueDeclare(
+                    $"{_service}.{typeof(TMessage).Name}", 
+                    exclusive: false ).QueueName; 
                 channel.QueueBind(
                     queue: queueName,
                     exchange: exchange,

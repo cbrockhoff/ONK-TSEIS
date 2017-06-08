@@ -19,10 +19,8 @@ namespace RestAPI.Helpers
 
         public async Task Invoke(HttpContext context)
         {
-            Console.WriteLine("Entering LoggingMiddleware.Invoke");
             var cameIn = DateTime.Now;
             await _next(context);
-            Console.WriteLine("Finishing LoggingMiddleware.Invoke");
             await _logger.Information(Guid.Empty, $"{context.Request.Method} {context.Request.Path} " +
                                                   $"handled in {(DateTime.Now - cameIn).Milliseconds}ms " +
                                                   $"with response {context.Response.StatusCode}");
