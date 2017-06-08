@@ -4,30 +4,30 @@ function deployrabbit
 {
 	param($ip)
 
-	Write-Host "Deploying rabbitmq @ $ip" -foreground "magenta"
+	Write-Host "Deploying rabbitmq" -foreground "magenta"
 	kubectl-delete -name "rabbitmq" -deployment -service
 	kubectl-run -name "rabbitmq" -port 5672
-	kubectl-expose -name "rabbitmq" -ip $ip
+	kubectl-expose -name "rabbitmq"
 }
 
 function deploydatabase
 {
-	param($name, $ip)
+	param($name)
 
-	Write-Host "Deploying $name @ $ip" -foreground "magenta"
+	Write-Host "Deploying $name" -foreground "magenta"
 	kubectl-delete -name $name -deployment -service
 	kubectl-run -name $name -port 5432
-	kubectl-expose -name $name -ip $ip
+	kubectl-expose -name $name
 }
 
 function deployrestapi
 {
-	param($name, $ip, $replicas=1)
+	param($name, $replicas=1)
 
-	Write-Host "Deploying $name @ $ip" -foreground "magenta"
+	Write-Host "Deploying $name" -foreground "magenta"
 	kubectl-delete -name $name -deployment -service
 	kubectl-run -name $name -port 5000 -replicas $replicas
-	kubectl-expose -name $name -ip $ip
+	kubectl-expose -name $name
 }
 
 function deployexternal
@@ -136,7 +136,7 @@ function kubectl-expose
 		}
 		else
 		{
-			$s = ((kubectl expose deployment $name --cluster-ip=$ip) 2>&1).ToString()
+			$s = ((kubectl expose deployment $name) 2>&1).ToString()
 		}
 		if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd'))
 		{
@@ -258,19 +258,19 @@ if($buildservices)
 
 if($deploy)
 {
-	deployrabbit                           -ip "10.0.0.100"
-	deploydatabase -name "logging-db"      -ip "10.0.0.50"
-	deploydatabase -name "broker-db"       -ip "10.0.0.90"
-	deploydatabase -name "ownercontrol-db" -ip "10.0.0.91"
-	deploydatabase -name "requester-db"    -ip "10.0.0.92"
-	deploydatabase -name "apigateway-db"   -ip "10.0.0.93"
+	deployrabbit
+	deploydatabase -name "logging-db"
+	deploydatabase -name "broker-db"
+	deploydatabase -name "ownercontrol-db"
+	deploydatabase -name "requester-db"
+	deploydatabase -name "apigateway-db"
 
 	Write-Host "Waiting a minute for databases and rabbit to be ready"
 	Start-Sleep -s 60
 
-	deployrestapi -name "ownercontrol-restapi" -ip "10.0.0.110"
-	deployrestapi -name "provider-restapi"     -ip "10.0.0.111"
-	deployrestapi -name "requester-restapi"    -ip "10.0.0.112"
+	deployrestapi -name "ownercontrol-restapi"
+	deployrestapi -name "provider-restapi"
+	deployrestapi -name "requester-restapi"
 
 	deployservice -name "broker-service"
 	deployservice -name "tobintaxer-service"

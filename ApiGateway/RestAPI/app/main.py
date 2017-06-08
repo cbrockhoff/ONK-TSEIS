@@ -13,9 +13,9 @@ users = Namespace(name="users", description="API for creating users")
 stocks = Namespace(name="stocks", description="API for managing stocks")
 admin = Namespace(name="admin", description="Administrator API")
 
-ownercontrol_url = 'http://10.0.0.110:5000/api'
-provider_url = 'http://10.0.0.111:5000/api'
-requester_url = 'http://10.0.0.112:5000/api'
+ownercontrol_url = 'http://ownercontrol-restapi:5000/api'
+provider_url = 'http://provider-restapi:5000/api'
+requester_url = 'http://requester-restapi:5000/api'
 
 api = Api(blueprint, version='1.0', title='TSEIS API', doc='/swagger/', default="TSEIS", default_label="The RestAPI for ITONK-TSEIS")
 app.register_blueprint(blueprint)
@@ -23,8 +23,8 @@ api.add_namespace(users)
 api.add_namespace(stocks)
 api.add_namespace(admin)
 
-users_database_connectionstring = "user='postgres' password='password' host='10.0.0.93' dbname='tseis'"
-log_database_connectionstring = "user='postgres' password='password' host='10.0.0.50' dbname='tseis'"
+users_database_connectionstring = "user='postgres' password='password' host='apigateway-db' dbname='tseis'"
+log_database_connectionstring = "user='postgres' password='password' host='logging-db' dbname='tseis'"
 
 def requires_auth(f):
 	@wraps(f)
