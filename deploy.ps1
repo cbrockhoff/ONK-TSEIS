@@ -155,14 +155,20 @@ if(!$builddbs -and !$buildservices -and !$deploy -and !$clean -and !$justapigate
 
 if($justapigateway)
 {
-	Write-Host "Building apigateway-restapi. This might take a while..." -foreground "magenta"
-	minikube docker-env -u | invoke-expression
-	docker build -t apigateway-restapi .\ApiGateway\RestAPI
-	docker save -o C:\docker_images\apigateway-restapi apigateway-restapi
-	minikube docker-env | invoke-expression
-	docker load -i C:\docker_images\apigateway-restapi
-	Write-Host "Deploying apigateway-restapi"
-	deployexternal -name "apigateway-restapi"
+	if($buildservices)
+	{
+		Write-Host "Building apigateway-restapi. This might take a while..." -foreground "magenta"
+		minikube docker-env -u | invoke-expression
+		docker build -t apigateway-restapi .\ApiGateway\RestAPI
+		docker save -o C:\docker_images\apigateway-restapi apigateway-restapi
+		minikube docker-env | invoke-expression
+		docker load -i C:\docker_images\apigateway-restapi
+	}
+	if($deploy)
+	{
+		Write-Host "Deploying apigateway-restapi"
+		deployexternal -name "apigateway-restapi"
+	}
 	return
 }
 
