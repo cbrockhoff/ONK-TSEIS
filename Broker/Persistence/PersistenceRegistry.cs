@@ -19,6 +19,10 @@ namespace Broker.Persistence
                     .Use<BuyOfferRepository>()
                     .Ctor<string>()
                     .Is(connectionString);
+                For<IStocksRepository>()
+                    .Use<StocksRepository>()
+                    .Ctor<string>()
+                    .Is(connectionString);
             });
         }
     }

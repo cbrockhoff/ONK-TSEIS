@@ -11,3 +11,9 @@ create table buyoffers(
 	price decimal,
 	amount integer
 );
+
+create table stocks(
+	ownerid uuid,
+	stock text,
+	amount integer
+);

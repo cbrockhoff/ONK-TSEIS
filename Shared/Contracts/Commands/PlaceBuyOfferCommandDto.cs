@@ -2,7 +2,7 @@
 
 namespace Shared.Contracts.Commands
 {
-    public class BuyStockCommandDto : ICommand
+    public class PlaceBuyOfferCommandDto : ICommand
     {
         public Guid BuyerId { get; set; }
         public string Stock { get; set; }

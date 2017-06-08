@@ -30,8 +30,17 @@ namespace Logging
             {
                 await c.OpenAsync().ConfigureAwait(false);
                 await c.ExecuteAsync(
-                    "insert into logs (correlationid, service, message, level) values (@correlationid, @service, @message, @level)",
-                    new { correlationid = correlationId, service = _service, message = message, level = level }).ConfigureAwait(false);
+                    "insert into logs (correlationid, service, message, level, occurred) " +
+                    "values (@correlationid, @service, @message, @level, @occurred)",
+                    new
+                    {
+                        correlationid = correlationId,
+                        service = _service,
+                        message = message,
+                        level = level,
+                        occurred = DateTime.Now
+
+                    }).ConfigureAwait(false);
             }
         }
     }

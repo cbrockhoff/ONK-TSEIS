@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Broker.Persistence;
+using Logging;
 using Shared.Contracts.Commands;
 using Shared.Contracts.Events;
 using Shared.Messaging;
@@ -20,16 +21,36 @@ namespace Broker.Service
             {
                 cfg.AddRegistry(new MessagingRegistry("Broker.Service"));
                 cfg.AddRegistry(new PersistenceRegistry("User ID=postgres;Password=password;Host=10.0.0.90;Port=5432;Database=tseis"));
+                cfg.AddRegistry(new LoggingRegistry("Broker.Service", "User ID=postgres;Password=password;Host=10.0.0.50;Port=5432;Database=tseis"));
             });
 
             var bus = container.GetInstance<IMessageBus>();
             var forSaleRepo = container.GetInstance<IStocksForSaleRepository>();
             var buyOfferRepo = container.GetInstance<IBuyOfferRepository>();
+            var ownerRepo = container.GetInstance<IStocksRepository>();
 
             var receives = new[]
             {
-                bus.Receive<SetStockForSaleCommandDto>(cmd => forSaleRepo.Write(cmd.SellerId, cmd.Stock, cmd.Amount, cmd.Price)),
-                bus.Receive<BuyStockCommandDto>(cmd => buyOfferRepo.Write(cmd.BuyerId, cmd.Stock, cmd.Amount, cmd.Price))
+                bus.Receive<SetStockForSaleCommandDto>(async cmd =>
+                {
+                    if ((await ownerRepo.GetAmount(cmd.SellerId, cmd.Stock) != cmd.Amount))
+                        return;
+
+                    await forSaleRepo.Write(cmd.SellerId, cmd.Stock, cmd.Amount, cmd.Price);
+                    await bus.Publish(new StockSetForSaleEventDto()
+                    {
+                        Name = cmd.Stock,
+                        Amount = cmd.Amount,
+                        Price = cmd.Price
+                    });
+                }),
+                bus.Receive<PlaceBuyOfferCommandDto>(cmd => buyOfferRepo.Write(cmd.BuyerId, cmd.Stock, cmd.Amount, cmd.Price)),
+                bus.Subscribe<StockTradeHappenedEventDto>(async e =>
+                {
+                    await ownerRepo.Delete(e.SellerId, e.Stock, e.Amount);
+                    await ownerRepo.Write(e.BuyerId, e.Stock, e.Amount);
+                }),
+                bus.Subscribe<UserReceivedStockEventDto>(e => ownerRepo.Write(e.UserId, e.Stock, e.Amount))
             };
 
             var timer = new Timer(o =>
