@@ -19,7 +19,7 @@ namespace TobinTaxer.Service
             container.Configure(cfg =>
             {
                 cfg.AddRegistry(new MessagingRegistry(Service));
-                cfg.AddRegistry(new LoggingRegistry(Service, "User ID=postgres;Password=password;Host=10.0.0.50;Port=5432;Database=tseis"));
+                cfg.AddRegistry(new LoggingRegistry(Service, "User ID=postgres;Password=password;Host=logging-db;Port=5432;Database=tseis"));
             });
 
             var bus = container.GetInstance<IMessageBus>();

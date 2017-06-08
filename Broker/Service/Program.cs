@@ -20,8 +20,8 @@ namespace Broker.Service
             container.Configure(cfg =>
             {
                 cfg.AddRegistry(new MessagingRegistry("Broker.Service"));
-                cfg.AddRegistry(new PersistenceRegistry("User ID=postgres;Password=password;Host=10.0.0.90;Port=5432;Database=tseis"));
-                cfg.AddRegistry(new LoggingRegistry("Broker.Service", "User ID=postgres;Password=password;Host=10.0.0.50;Port=5432;Database=tseis"));
+                cfg.AddRegistry(new PersistenceRegistry("User ID=postgres;Password=password;Host=broker-db;Port=5432;Database=tseis"));
+                cfg.AddRegistry(new LoggingRegistry("Broker.Service", "User ID=postgres;Password=password;Host=logging-db;Port=5432;Database=tseis"));
             });
 
             var bus = container.GetInstance<IMessageBus>();
