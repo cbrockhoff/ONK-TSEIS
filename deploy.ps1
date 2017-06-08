@@ -166,7 +166,6 @@ if($justapigateway)
 	}
 	if($deploy)
 	{
-		Write-Host "Deploying apigateway-restapi"
 		deployexternal -name "apigateway-restapi"
 	}
 	return

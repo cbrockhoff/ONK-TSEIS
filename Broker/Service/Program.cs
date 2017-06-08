@@ -13,15 +13,18 @@ namespace Broker.Service
 {
     class Program
     {
+        private const string Service = "Broker.Service";
+
         static void Main(string[] args)
         {
             Console.WriteLine("Broker service started...");
+
             var container = new Container();
             container.Configure(cfg =>
             {
-                cfg.AddRegistry(new MessagingRegistry("Broker.Service"));
+                cfg.AddRegistry(new MessagingRegistry(Service));
                 cfg.AddRegistry(new PersistenceRegistry("User ID=postgres;Password=password;Host=broker-db;Port=5432;Database=tseis"));
-                cfg.AddRegistry(new LoggingRegistry("Broker.Service", "User ID=postgres;Password=password;Host=logging-db;Port=5432;Database=tseis"));
+                cfg.AddRegistry(new LoggingRegistry(Service, "User ID=postgres;Password=password;Host=logging-db;Port=5432;Database=tseis"));
             });
 
             var bus = container.GetInstance<IMessageBus>();
@@ -29,11 +32,6 @@ namespace Broker.Service
             var buyOfferRepo = container.GetInstance<IBuyOfferRepository>();
             var ownerRepo = container.GetInstance<IStocksRepository>();
 
-            bus.Subscribe<StockTradeHappenedEventDto>(async e =>
-            {
-                await ownerRepo.Delete(e.SellerId, e.Stock, e.Amount);
-                await ownerRepo.Write(e.BuyerId, e.Stock, e.Amount);
-            });
             bus.Subscribe<UserReceivedStockEventDto>(e => ownerRepo.Write(e.UserId, e.Stock, e.Amount));
             bus.Receive<SetStockForSaleCommandDto>(async cmd =>
             {
@@ -52,7 +50,7 @@ namespace Broker.Service
 
             var timer = new Timer(o =>
             {
-                MatchOffers(forSaleRepo, buyOfferRepo, bus);
+                MatchOffers(forSaleRepo, buyOfferRepo, ownerRepo, bus);
             }, null, 10000, 10000);
 
             var hack = new ManualResetEvent(false);
@@ -64,6 +62,7 @@ namespace Broker.Service
         static void MatchOffers(
             IStocksForSaleRepository forSaleRepo, 
             IBuyOfferRepository buyOffersRepo,
+            IStocksRepository ownerRepo,
             IMessageBus bus)
         {
             var forSaleTask = forSaleRepo.Read();
@@ -89,7 +88,9 @@ namespace Broker.Service
                     Task.WhenAll(
                         buyOffersRepo.Delete(offer.BuyerId, offer.Stock, offer.Amount, offer.Price),
                         forSaleRepo.Delete(matchingForSale.SellerId, matchingForSale.Stock, matchingForSale.Amount, matchingForSale.Price),
-                        bus.Publish(new StockTradeHappenedEventDto()
+                        ownerRepo.Delete(matchingForSale.SellerId, offer.Stock, offer.Amount),
+                        ownerRepo.Write(offer.BuyerId, offer.Stock, offer.Amount),
+                    bus.Publish(new StockTradeHappenedEventDto()
                         {
                             BuyerId = offer.BuyerId,
                             SellerId = matchingForSale.SellerId,
