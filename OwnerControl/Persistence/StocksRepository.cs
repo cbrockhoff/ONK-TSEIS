@@ -27,5 +27,35 @@ namespace OwnerControl.Persistence
                     new {id = userId}).ConfigureAwait(false);
             }
         }
+
+        public async Task Write(Guid userId, string stock, int amount)
+        {
+            using (var c = Connection)
+            {
+                await c.OpenAsync().ConfigureAwait(false);
+                await c.ExecuteAsync(
+                    "insert into stocks (userid, name, amount) values (@userid, @name, @amount)",
+                    new { userid = userId, name=stock, amount=amount }).ConfigureAwait(false);
+            }
+        }
+
+        public async Task Delete(Guid userId, string stock, int amount)
+        {
+            using (var c = Connection)
+            {
+                try
+                {
+                    await c.OpenAsync().ConfigureAwait(false);
+                    await c.ExecuteAsync(
+                        "delete from stocks where userid=@id and name=@stock and amount=@amount",
+                        new { userid = userId, name = stock, amount = amount }).ConfigureAwait(false);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Shit went down when deleting...\n{e.Message}");
+                    throw;
+                }
+            }
+        }
     }
 }

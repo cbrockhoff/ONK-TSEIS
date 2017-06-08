@@ -42,7 +42,7 @@ namespace Requester.RestAPI.Controllers
         [Route("forsale/buy")]
         public async Task<IActionResult> BuyStocks(BuyStocksInputModel input)
         {
-            await _bus.Send(new BuyStockCommandDto()
+            await _bus.Send(new PlaceBuyOfferCommandDto()
             {
                 BuyerId = Request.GetAuthenticatedUser(),
                 Amount = input.Amount,

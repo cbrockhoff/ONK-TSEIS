@@ -1,4 +1,14 @@
-param([switch]$builddbs, [switch]$buildservices, [switch]$deploy, [switch]$clean)
+param([switch]$builddbs, [switch]$buildservices, [switch]$deploy, [switch]$clean, [switch]$justapigateway, [switch]$skipapigateway)
+
+function deployrabbit
+{
+	param($ip)
+
+	Write-Host "Deploying rabbitmq @ $ip" -foreground "magenta"
+	kubectl-delete -name "rabbitmq" -deployment -service
+	kubectl-run -name "rabbitmq" -port 5672
+	kubectl-expose -name "rabbitmq" -ip $ip
+}
 
 function deploydatabase
 {
@@ -49,7 +59,7 @@ function kubectl-delete
 		while($i -lt 15)
 		{
 			$s = ((kubectl delete deployment $name) 2>&1).ToString()
-			if($s.Contains('connectex') -or $s.Contains('unexpected EOF'))
+			if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd'))
 			{
 				Start-Sleep -s 1
 			}
@@ -70,7 +80,7 @@ function kubectl-delete
 		while($i -lt 15)
 		{
 			$s = ((kubectl delete service $name) 2>&1).ToString()
-			if($s.Contains('connectex') -or $s.Contains('unexpected EOF'))
+			if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd'))
 			{
 				Start-Sleep -s 1
 			}
@@ -101,7 +111,7 @@ function kubectl-run
 		{
 			$s = ((kubectl run $name --image=$name --replicas=$replicas --image-pull-policy=Never) 2>&1).ToString()
 		}
-		if($s.Contains('connectex' -or $s.Contains('unexpected EOF')))
+		if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd'))
 		{
 			Start-Sleep -s 1
 		}
@@ -128,7 +138,7 @@ function kubectl-expose
 		{
 			$s = ((kubectl expose deployment $name --cluster-ip=$ip) 2>&1).ToString()
 		}
-		if($s.Contains('connectex') -or $s.Contains('unexpected EOF'))
+		if($s.Contains('connectex') -or $s.Contains('unexpected EOF') -or $s.Contains('has no leader') -or $s.Contains('etcd'))
 		{
 			Start-Sleep -s 1
 		}
@@ -141,25 +151,40 @@ function kubectl-expose
 	}
 }
 
-if(!$builddbs -and !$buildservices -and !$deploy -and !$clean) {return}
+if(!$builddbs -and !$buildservices -and !$deploy -and !$clean -and !$justapigateway) {return}
+
+if($justapigateway)
+{
+	Write-Host "Building apigateway-restapi. This might take a while..." -foreground "magenta"
+	minikube docker-env -u | invoke-expression
+	docker build -t apigateway-restapi .\ApiGateway\RestAPI
+	docker save -o C:\docker_images\apigateway-restapi apigateway-restapi
+	minikube docker-env | invoke-expression
+	docker load -i C:\docker_images\apigateway-restapi
+	Write-Host "Deploying apigateway-restapi"
+	deployexternal -name "apigateway-restapi"
+}
 
 if($clean)
 {
-	Write-Host "Ignore '(NotFound)' errors from Kubectl - removing services and deployments even though they don't exist" -foreground "red"
 	Write-Host "Deleting services..." -foreground "magenta"
-	kubectl delete service ownercontrol-restapi; kubectl delete deployment ownercontrol-restapi
-	kubectl delete service provider-restapi; kubectl delete deployment provider-restapi
-	kubectl delete service requester-restapi; kubectl delete deployment requester-restapi
-	kubectl delete service apigateway-restapi; kubectl delete deployment apigateway-restapi
-	kubectl delete deployment broker-service
-	kubectl delete deployment tobintaxer-service
+	kubectl-delete -name "ownercontrol-restapi" -service -deployment
+	kubectl-delete -name "provider-restapi" -service -deployment
+	kubectl-delete -name "requester-restapi" -service -deployment
+	kubectl-delete -name "apigateway-restapi" -service -deployment
+
+	kubectl-delete -name "broker-service" -deployment
+	kubectl-delete -name "tobintaxer-service" -deployment
 
 	Write-Host "Deleting databases..." -foreground "magenta"
-	kubectl delete service logging-db; kubectl delete deployment logging-db
-	kubectl delete service broker-db; kubectl delete deployment broker-db
-	kubectl delete service ownercontrol-db; kubectl delete deployment ownercontrol-db
-	kubectl delete service requester-db; kubectl delete deployment requester-db
-	kubectl delete service apigateway-db; kubectl delete deployment apigateway-db
+	kubectl-delete -name "logging-db" -service -deployment
+	kubectl-delete -name "broker-db" -service -deployment
+	kubectl-delete -name "ownercontrol-db" -service -deployment
+	kubectl-delete -name "requester-db" -service -deployment
+	kubectl-delete -name "apigateway-db" -service -deployment
+
+	Write-Host "Deleting RabbitMQ..." -foreground "magenta"
+	kubectl-delete -name "rabbitmq" -service -deployment 
 
 	Write-Host "Finished cleaning... Exiting."
 	return
@@ -193,7 +218,7 @@ if($buildservices)
 	$env:DOTNET_CLI_TELEMETRY_OPTOUT = 1 # because fuck Microsoft Telemetry
 
 	Write-Host "Building broker-service" -foreground "magenta"
-	dotnet publish .\Broker\Service -o obj\Docker\publish -v m
+	dotnet publish .\Broker\Service -o obj\Docker\publish -v magenta
 	docker build -t broker-service .\Broker\Service
 
 	Write-Host "Building ownercontrol-restapi" -foreground "magenta"
@@ -212,27 +237,29 @@ if($buildservices)
 	dotnet publish .\TobinTaxer\Service -o obj\Docker\publish -v m
 	docker build -t tobintaxer-service .\TobinTaxer\Service	
 	
-	Write-Host "Building apigateway-restapi" -foreground "magenta"
-	minikube docker-env -u | invoke-expression
-	docker build -t apigateway-restapi .\ApiGateway\RestAPI
-	Write-Host "This might take a while... Pulling image from Docker host to local machine, and pushing it to Minikube" -foreground "magenta"
-	docker save -o C:\docker_images\apigateway-restapi apigateway-restapi
-	minikube docker-env | invoke-expression
-	docker load -i C:\docker_images\apigateway-restapi
+	if(!$skipapigateway)
+	{
+		Write-Host "Building apigateway-restapi" -foreground "magenta"
+		minikube docker-env -u | invoke-expression
+		docker build -t apigateway-restapi .\ApiGateway\RestAPI
+		Write-Host "This might take a while... Pulling image from Docker host to local machine, and pushing it to Minikube" -foreground "magenta"
+		docker save -o C:\docker_images\apigateway-restapi apigateway-restapi
+		minikube docker-env | invoke-expression
+		docker load -i C:\docker_images\apigateway-restapi
+	}
 }
 
 if($deploy)
 {
-	Write-Host "Assuming RabbitMQ is already running"
-
+	deployrabbit                           -ip "10.0.0.100"
 	deploydatabase -name "logging-db"      -ip "10.0.0.50"
 	deploydatabase -name "broker-db"       -ip "10.0.0.90"
 	deploydatabase -name "ownercontrol-db" -ip "10.0.0.91"
 	deploydatabase -name "requester-db"    -ip "10.0.0.92"
 	deploydatabase -name "apigateway-db"   -ip "10.0.0.93"
 
-	Write-Host "Waiting 15 seconds for databases to be ready"
-	Start-Sleep -s 15
+	Write-Host "Waiting a minute for databases and rabbit to be ready"
+	Start-Sleep -s 60
 
 	deployrestapi -name "ownercontrol-restapi" -ip "10.0.0.110"
 	deployrestapi -name "provider-restapi"     -ip "10.0.0.111"
@@ -241,7 +268,10 @@ if($deploy)
 	deployservice -name "broker-service"
 	deployservice -name "tobintaxer-service"
 
-	deployexternal -name "apigateway-restapi"
+	if(!$skipapigateway)
+	{
+		deployexternal -name "apigateway-restapi"
+	}
 }
 
 minikube docker-env -u | invoke-expression

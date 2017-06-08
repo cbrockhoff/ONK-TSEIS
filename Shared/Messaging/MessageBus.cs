@@ -16,6 +16,7 @@ namespace Shared.Messaging
         private readonly IConnectionFactory _connectionFactory;
         private readonly ILogger _logger;
         private readonly string _service;
+        private readonly List<IDisposable> _connections  = new List<IDisposable>();
 
         public MessageBus(IConnectionFactory connectionFactory, ILogger logger, string service)
         {
@@ -41,7 +42,7 @@ namespace Shared.Messaging
                         body: body);
                 }
             });
-            await _logger.Information(Guid.Empty, $"Successfully published message {Encoding.UTF8.GetString(body)}");
+            await _logger.Information(Guid.Empty, $"Successfully published {@event.GetType().Name} with body {Encoding.UTF8.GetString(body)}");
         }
 
         public IDisposable Subscribe<TMessage>(Func<TMessage, Task> onEvent) where TMessage : IEvent
@@ -55,18 +56,20 @@ namespace Shared.Messaging
                 routingKey: typeof(TMessage).Name);
 
             var consumer = new EventingBasicConsumer(channel);
-            consumer.Received += (o, args) =>
+            consumer.Received += (o, args) => Manage<TMessage>(() =>
             {
                 var message = DeserializeMessage<TMessage>(args.Body);
                 onEvent(message).Wait();
-                _logger.Information(Guid.Empty, $"Successfully handled message {message}").GetAwaiter().GetResult();
-            };
+                _logger.Information(Guid.Empty, $"Successfully handled {typeof(TMessage).Name} with body {JsonConvert.SerializeObject(message)}").GetAwaiter().GetResult();
+            });
 
             channel.BasicConsume(
                 queue: queueName,
                 noAck: false,
                 consumer: consumer);
 
+            _connections.Add(channel);
+            Console.WriteLine($"Subscribed to {typeof(TMessage).Name}");
             return channel;
         }
 
@@ -91,7 +94,7 @@ namespace Shared.Messaging
                         body: body);
                 }
             });
-            await _logger.Information(Guid.Empty, $"Successfully published message {Encoding.UTF8.GetString(body)}");
+            await _logger.Information(Guid.Empty, $"Successfully published {command.GetType().Name} with body {Encoding.UTF8.GetString(body)}");
         }
 
         public IDisposable Receive<TMessage>(Func<TMessage, Task> onCommand) where TMessage : ICommand
@@ -100,18 +103,20 @@ namespace Shared.Messaging
             var queue = DeclareQueue(channel, typeof(TMessage));
 
             var consumer = new EventingBasicConsumer(channel);
-            consumer.Received += (o, args) =>
+            consumer.Received += (o, args) => Manage<TMessage>(() =>
             {
                 var message = DeserializeMessage<TMessage>(args.Body);
                 onCommand(message).Wait();
-                _logger.Information(Guid.Empty, $"Successfully handled message {message}").GetAwaiter().GetResult();
-            };
+                _logger.Information(Guid.Empty, $"Successfully handled {typeof(TMessage).Name} with body {JsonConvert.SerializeObject(message)}").GetAwaiter().GetResult();
+            });
 
             channel.BasicConsume(
                 queue: queue,
                 noAck: false,
                 consumer: consumer);
 
+            _connections.Add(channel);
+            Console.WriteLine($"Receiving {typeof(TMessage).Name}");
             return channel;
         }
 
@@ -144,6 +149,19 @@ namespace Shared.Messaging
                 exclusive: false,
                 autoDelete: false); 
             return queue;
+        }
+
+        private void Manage<TMessage>(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                _logger.Error(Guid.Empty, $"Error handling {typeof(TMessage).Name}: {e.Message}");
+            }
         }
     }
 }

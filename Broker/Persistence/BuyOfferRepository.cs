@@ -18,7 +18,7 @@ namespace Broker.Persistence
             using (var c = Connection)
             {
                 await c.OpenAsync().ConfigureAwait(false);
-                return await c.QueryAsync<BuyOfferReadModel>("select * from forsale").ConfigureAwait(false);
+                return await c.QueryAsync<BuyOfferReadModel>("select * from buyoffers").ConfigureAwait(false);
             }
         }
 

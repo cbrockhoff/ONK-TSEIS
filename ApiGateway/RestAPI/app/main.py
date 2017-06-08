@@ -11,7 +11,7 @@ blueprint = Blueprint('api', __name__, url_prefix='/api')
 
 users = Namespace(name="users", description="API for creating users")
 stocks = Namespace(name="stocks", description="API for managing stocks")
-logs = Namespace(name="logs", description="Administrator API for fetching logs")
+admin = Namespace(name="admin", description="Administrator API")
 
 ownercontrol_url = 'http://10.0.0.110:5000/api'
 provider_url = 'http://10.0.0.111:5000/api'
@@ -21,7 +21,7 @@ api = Api(blueprint, version='1.0', title='TSEIS API', doc='/swagger/', default=
 app.register_blueprint(blueprint)
 api.add_namespace(users)
 api.add_namespace(stocks)
-api.add_namespace(logs)
+api.add_namespace(admin)
 
 users_database_connectionstring = "user='postgres' password='password' host='10.0.0.93' dbname='tseis'"
 log_database_connectionstring = "user='postgres' password='password' host='10.0.0.50' dbname='tseis'"
@@ -34,11 +34,23 @@ def requires_auth(f):
 		password = request.headers.get('tseis-password')
 		if not username or not password:
 			abort(401, "No credentials provided")
-		userid = get_userid(username, password)
+		userid = get_userid(username)
 		if not userid:
 			abort(401, "Invalid username or password")
 
 		request.authenticated_user = userid
+		return f(*args, **kwargs)
+	return decorated
+
+def requires_admin(f):
+	@wraps(f)
+	def decorated(*args, **kwargs):
+		print("authenticating request")
+		username = request.headers.get('tseis-username')
+		password = request.headers.get('tseis-password')
+		if username != "admin" or password != "admin":
+			abort(401, "Invalid or no credentials")
+
 		return f(*args, **kwargs)
 	return decorated
 
@@ -64,11 +76,11 @@ def create_user(userid, username, password):
 	cur.close()
 	conn.close()
 
-def get_userid(username, password):
+def get_userid(username):
 	conn = psycopg2.connect(users_database_connectionstring)
 	cur = conn.cursor()
 
-	cur.execute('select id from users where username=%s and password=%s', (username, password))
+	cur.execute('select id from users where username=%s', (username))
 	userid = cur.fetchone()
 
 	cur.close()
@@ -79,7 +91,7 @@ def get_logs():
 	conn = psycopg2.connect(log_database_connectionstring)
 	cur = conn.cursor()
 
-	cur.execute('select * from logs')
+	cur.execute('select * from logs order by logs.occurred desc')
 	logs = cur.fetchall()
 
 	cur.close()
@@ -144,7 +156,7 @@ class UsersApi(Resource):
 class OwnStocks(Resource):
 	@api.response(200, "Successfully retrieved your stocks")
 	def get(self):
-		return api_get(ownercontrol_url + 'users/me/stocks')		
+		return api_get(ownercontrol_url + '/users/me/stocks')		
 
 @api.response(401, "Invalid credentials")
 @api.header('tseis-username', 'Your username', required=True)
@@ -190,18 +202,34 @@ class BuyStocks(Resource):
 @api.response(401, "Invalid credentials")
 @api.header('tseis-username', 'Your username (requires administrator rights)', required=True)
 @api.header('tseis-password', 'Your password', required=True)
-@logs.route('/', methods=['GET'])
+@admin.route('/logs', methods=['GET'])
 class GetLogs(Resource):
+	@requires_admin
 	@api.response(200, "Logs successfully fetched")
 	def get(self):
-		username = request.headers.get('tseis-username')
-		password = request.headers.get('tseis-password')
-		if username != "admin" or password != "admin":
-			abort(401, "Invalid or no credentials")
-
 		logs = get_logs()
 		logs = [{'time': str(x[4]), 'service': x[1], 'message':x[2]} for x in logs]
 		return logs, 200
+
+@api.response(401, "Invalid credentials")
+@api.header('tseis-username', 'Your username (requires administrator rights)', required=True)
+@api.header('tseis-password', 'Your password', required=True)
+@admin.route('/users/<username>/stocks', methods=['POST'])
+class AddStocks(Resource):
+	add_input = api.model('Stocks to add', {
+	    'name': fields.String,
+	    'amount': fields.Integer
+	})
+
+	@api.response(200, "Stocks successfully added to user")
+	@requires_admin
+	@api.doc(body=add_input)
+	def post(self, username):
+		userid = get_userid(username)
+		headers = {"AuthenticatedUser" : userid}
+		json_body = request.get_json(force=True)
+		r = requests.post(ownercontrol_url+'/users/me/stocks', headers=headers, data=json_body)
+		return r.text, r.status_code
 
 if __name__ == '__main__':
 	app.run(host='0.0.0.0', port=80, debug=True)
