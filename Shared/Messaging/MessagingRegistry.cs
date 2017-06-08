@@ -11,7 +11,7 @@ namespace Shared.Messaging
             {
                 r.TheCallingAssembly();
                 r.WithDefaultConventions();
-                For<ConnectionFactory>().Use(new ConnectionFactory()
+                For<IConnectionFactory>().Use(new ConnectionFactory()
                 {
                     HostName = "10.0.0.100" // mmh, hardcoded
                 });
