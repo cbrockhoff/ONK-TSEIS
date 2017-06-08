@@ -28,8 +28,8 @@ namespace Requester.Persistence
             {
                 await c.OpenAsync().ConfigureAwait(false);
                 await c.ExecuteAsync(
-                    "insert into forsale (name, price, amount) values (@stock, @price, @amount)",
-                    new { name = stockName, price = price, amount = amount }).ConfigureAwait(false);
+                    "insert into forsale (stock, price, amount) values (@stock, @price, @amount)",
+                    new { stock = stockName, price = price, amount = amount }).ConfigureAwait(false);
             }
         }
     }
