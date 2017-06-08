@@ -71,6 +71,7 @@ namespace Requester.RestAPI
             var bus = provider.GetService<IMessageBus>();
             var repo = provider.GetService<IStocksForSaleWriteRepository>();
             bus.Subscribe<StockSetForSaleEventDto>(e => repo.Write(e.Name, e.Amount, e.Price));
+            bus.Subscribe<StockTradeHappenedEventDto>(e => repo.Delete(e.Stock, e.Amount, e.Price));
         }
     }
 }

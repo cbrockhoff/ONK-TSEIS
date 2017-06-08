@@ -32,5 +32,16 @@ namespace Requester.Persistence
                     new { stock = stockName, price = price, amount = amount }).ConfigureAwait(false);
             }
         }
+
+        public async Task Delete(string stockName, int amount, decimal price)
+        {
+            using (var c = Connection)
+            {
+                await c.OpenAsync().ConfigureAwait(false);
+                await c.ExecuteAsync(
+                    "delete from forsale where stock=@stock and price=@price and amount=@amount",
+                    new { stock = stockName, price = price, amount = amount }).ConfigureAwait(false);
+            }
+        }
     }
 }
