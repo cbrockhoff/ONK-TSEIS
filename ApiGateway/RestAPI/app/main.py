@@ -80,7 +80,7 @@ def get_userid(username):
 	conn = psycopg2.connect(users_database_connectionstring)
 	cur = conn.cursor()
 
-	cur.execute('select id from users where username=%s', (username))
+	cur.execute('select id from users where username=%s', (username,))
 	userid = cur.fetchone()
 
 	cur.close()
