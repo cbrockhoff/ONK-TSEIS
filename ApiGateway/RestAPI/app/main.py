@@ -32,7 +32,7 @@ def requires_auth(f):
 		print("authenticating request")
 		username = request.headers.get('tseis-username')
 		password = request.headers.get('tseis-password')
-		if not username or not password:
+		if not username or not password or not verify_user(username, password):
 			abort(401, "No credentials provided")
 		userid = get_userid(username)
 		if not userid:
@@ -86,6 +86,17 @@ def get_userid(username):
 	cur.close()
 	conn.close()
 	return None if userid is None else userid[0]
+
+def verify_user(username, password):
+	conn = psycopg2.connect(users_database_connectionstring)
+	cur = conn.cursor()
+
+	cur.execute('select id from users where username=%s and password=%s', (username, password))
+	userid = cur.fetchone()
+
+	cur.close()
+	conn.close()
+	return userid is not None
 
 def get_logs():
 	conn = psycopg2.connect(log_database_connectionstring)

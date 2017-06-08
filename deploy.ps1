@@ -163,6 +163,7 @@ if($justapigateway)
 	docker load -i C:\docker_images\apigateway-restapi
 	Write-Host "Deploying apigateway-restapi"
 	deployexternal -name "apigateway-restapi"
+	return
 }
 
 if($clean)
